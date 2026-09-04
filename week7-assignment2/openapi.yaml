@@ -1,0 +1,1412 @@
+openapi: 3.1.0
+info:
+  title: Task Management Platform API
+  description: REST API contract for the CMIT Internship Task Management platform.
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: Authentication (public)
+  - name: Users
+    description: User management
+  - name: Projects
+    description: Project management
+  - name: Project Members
+    description: Project membership (nested under projects)
+  - name: Tasks
+    description: Task management (nested under projects)
+  - name: Tags
+    description: Global tag management
+  - name: Comments
+    description: Task comments (nested under projects/tasks)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      description: Page number (1-indexed).
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: Rows per page (clamped to 100).
+    Sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: "createdAt:desc"
+      description: "Sort field and direction, e.g. `createdAt:desc`, `priority:asc`."
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+      description: Case-insensitive substring match on name or title.
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Project ID.
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Task ID.
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: User ID.
+    TagId:
+      name: tagId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Tag ID.
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Comment ID.
+
+  schemas:
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 142
+        totalPages:
+          type: integer
+          example: 8
+      required: [page, pageSize, total, totalPages]
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        error:
+          type: string
+          example: Bad Request
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-09-02T10:31:00.000Z"
+        path:
+          type: string
+          example: "/api/v1/projects/1/tasks"
+      required: [statusCode, message, error, timestamp, path]
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Ayesha Khan
+        email:
+          type: string
+          format: email
+          example: ayesha.khan@example.com
+      required: [id, name, email]
+
+    User:
+      allOf:
+        - $ref: "#/components/schemas/UserSummary"
+        - type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+              example: "2026-09-02T10:30:00.000Z"
+          required: [createdAt]
+
+    ProjectSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Apollo Web Platform
+      required: [id, name]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Apollo Web Platform
+        ownerId:
+          type: integer
+          example: 1
+        owner:
+          $ref: "#/components/schemas/UserSummary"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-02T10:30:00.000Z"
+      required: [id, name, ownerId, createdAt]
+
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Apollo Web Platform
+      required: [name]
+
+    TagResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        name:
+          type: string
+          example: urgent
+      required: [id, name]
+
+    CreateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: urgent
+      required: [name]
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 16
+        title:
+          type: string
+          example: Upgrade PostgreSQL to 16
+        description:
+          type: string
+          nullable: true
+          example: Past its due date and still open.
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+          example: todo
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        projectId:
+          type: integer
+          example: 1
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+        assigneeId:
+          type: integer
+          nullable: true
+          example: 4
+        assignee:
+          oneOf:
+            - $ref: "#/components/schemas/UserSummary"
+            - type: "null"
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-09-10"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagResponse"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-02T10:30:00.000Z"
+      required: [id, title, status, priority, projectId, createdAt]
+
+    CreateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Upgrade PostgreSQL to 16
+        description:
+          type: string
+          nullable: true
+          example: Past its due date and still open.
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+          default: todo
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        assigneeId:
+          type: integer
+          nullable: true
+          example: 4
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-09-10"
+        tagIds:
+          type: array
+          items:
+            type: integer
+          example: [5, 3, 6]
+      required: [title, priority]
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+        assigneeId:
+          type: integer
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        tagIds:
+          type: array
+          items:
+            type: integer
+
+    MemberResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          example: 5
+        projectId:
+          type: integer
+          example: 1
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+          example: member
+        user:
+          $ref: "#/components/schemas/UserSummary"
+      required: [userId, projectId, role]
+
+    AddMemberRequest:
+      type: object
+      properties:
+        userId:
+          type: integer
+          example: 5
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+          example: member
+      required: [userId, role]
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+          example: admin
+      required: [role]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 11
+        taskId:
+          type: integer
+          example: 8
+        authorId:
+          type: integer
+          example: 1
+        author:
+          $ref: "#/components/schemas/UserSummary"
+        body:
+          type: string
+          example: Blocked on the maintenance window.
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-02T11:00:00.000Z"
+      required: [id, taskId, authorId, body, createdAt]
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 5000
+          example: Blocked on the maintenance window.
+      required: [body]
+
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Ayesha Khan
+        email:
+          type: string
+          format: email
+          example: ayesha.khan@example.com
+        password:
+          type: string
+          minLength: 8
+          example: "S3cureP@ss!"
+      required: [name, email, password]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: ayesha.khan@example.com
+        password:
+          type: string
+          example: "S3cureP@ss!"
+      required: [email, password]
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refreshToken:
+          type: string
+          example: d3f1a2b4-9c8e-4f7a-b123-abcdef012345
+        expiresIn:
+          type: integer
+          example: 900
+          description: Access token lifetime in seconds.
+      required: [accessToken, refreshToken, expiresIn]
+
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          example: d3f1a2b4-9c8e-4f7a-b123-abcdef012345
+      required: [refreshToken]
+
+  responses:
+    BadRequest:
+      description: Validation failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            statusCode: 400
+            message: ["title must be a non-empty string", "priority must be an integer between 1 and 5"]
+            error: Bad Request
+            timestamp: "2026-09-02T10:31:00.000Z"
+            path: "/api/v1/projects/1/tasks"
+    Unauthorized:
+      description: Missing, expired, or invalid JWT.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            statusCode: 401
+            message: Access token is missing or expired
+            error: Unauthorized
+            timestamp: "2026-09-02T10:32:00.000Z"
+            path: "/api/v1/projects/1/tasks"
+    Forbidden:
+      description: Authenticated but insufficient role.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            statusCode: 403
+            message: "You need at least the 'member' role on this project"
+            error: Forbidden
+            timestamp: "2026-09-02T10:33:00.000Z"
+            path: "/api/v1/projects/1/tasks"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            statusCode: 404
+            message: Project with id 999 not found
+            error: Not Found
+            timestamp: "2026-09-02T10:34:00.000Z"
+            path: "/api/v1/projects/999/tasks"
+    Conflict:
+      description: Duplicate resource conflict.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            statusCode: 409
+            message: A tag with this name already exists
+            error: Conflict
+            timestamp: "2026-09-02T10:35:00.000Z"
+            path: "/api/v1/tags"
+
+paths:
+  # ---- Auth ----
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: "**Access: Public**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      description: "**Access: Public**. Returns access + refresh tokens. Wrong password → 401."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh tokens
+      description: "**Access: Public** (refresh token is the credential). Revokes old refresh token, issues new pair."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Tokens refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      description: "**Access: Authenticated**. Revokes the refresh token."
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "204":
+          description: Logged out.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ---- Users ----
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Paged list of users.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Users]
+      summary: Update user (self only)
+      description: "**Access: Authenticated** — caller's id must match :userId"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: User updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Users]
+      summary: Delete user (self only)
+      description: "**Access: Authenticated** — caller's id must match :userId. Fails if user owns projects or authored comments."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: User deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  # ---- Projects ----
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects (caller is a member of)
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Paged list of projects.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Project"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Projects]
+      summary: Create project
+      description: "**Access: Authenticated**. Creator becomes the owner."
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /projects/{projectId}:
+    get:
+      tags: [Projects]
+      summary: Get project by ID
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Projects]
+      summary: Update project
+      description: "**Access: Role-restricted** — owner or admin"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "200":
+          description: Project updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      description: "**Access: Role-restricted** — owner only. Cascades to members, tasks, comments."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Project deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---- Project Members ----
+  /projects/{projectId}/members:
+    get:
+      tags: [Project Members]
+      summary: List project members
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, admin, member, viewer]
+          description: Filter by role.
+      responses:
+        "200":
+          description: Paged list of members.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MemberResponse"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Project Members]
+      summary: Add member to project
+      description: "**Access: Role-restricted** — owner or admin"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+      responses:
+        "201":
+          description: Member added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /projects/{projectId}/members/{userId}:
+    patch:
+      tags: [Project Members]
+      summary: Update member role
+      description: "**Access: Role-restricted** — owner or admin (admins cannot promote to owner)"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: Role updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Project Members]
+      summary: Remove member from project
+      description: "**Access: Role-restricted** — owner or admin. The project owner cannot be removed."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Member removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---- Tasks ----
+  /projects/{projectId}/tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks in a project
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [todo, in_progress, done]
+        - name: assigneeId
+          in: query
+          schema:
+            type: integer
+        - name: tagId
+          in: query
+          schema:
+            type: integer
+        - name: priority
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+      responses:
+        "200":
+          description: Paged list of tasks.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Tasks]
+      summary: Create task
+      description: "**Access: Role-restricted** — owner, admin, or member. Supports Idempotency-Key header."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Optional UUID for idempotent creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Task created.
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URI of the new task.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          description: Idempotency-Key was already used with a different request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{projectId}/tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: Get task by ID
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Tasks]
+      summary: Update task (partial)
+      description: "**Access: Role-restricted** — owner, admin, or member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Task updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Tasks]
+      summary: Delete task
+      description: "**Access: Role-restricted** — owner or admin. Cascades to task_tags and comments."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "204":
+          description: Task deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---- Tags ----
+  /tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Paged list of tags.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TagResponse"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Tags]
+      summary: Create tag
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTagRequest"
+      responses:
+        "201":
+          description: Tag created.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tags/{tagId}:
+    get:
+      tags: [Tags]
+      summary: Get tag by ID
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TagId"
+      responses:
+        "200":
+          description: Tag found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Tags]
+      summary: Update tag
+      description: "**Access: Authenticated**"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TagId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTagRequest"
+      responses:
+        "200":
+          description: Tag updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Tags]
+      summary: Delete tag
+      description: "**Access: Authenticated**. Cascades to task_tags."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TagId"
+      responses:
+        "204":
+          description: Tag deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---- Comments ----
+  /projects/{projectId}/tasks/{taskId}/comments:
+    get:
+      tags: [Comments]
+      summary: List comments on a task
+      description: "**Access: Role-restricted** — any project member. Default sort: createdAt:asc."
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: Paged list of comments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Comments]
+      summary: Create comment
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Comment created.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{projectId}/tasks/{taskId}/comments/{commentId}:
+    get:
+      tags: [Comments]
+      summary: Get comment by ID
+      description: "**Access: Role-restricted** — any project member"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/CommentId"
+      responses:
+        "200":
+          description: Comment found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Comments]
+      summary: Update comment (author only)
+      description: "**Access: Authenticated** — caller must be the comment author"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/CommentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "200":
+          description: Comment updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      description: "**Access: Role-restricted** — comment author, or project owner/admin"
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/CommentId"
+      responses:
+        "204":
+          description: Comment deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
